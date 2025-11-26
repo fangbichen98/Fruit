@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { CartItem, RecipeResponse } from '../types';
-import { ShoppingBag, X, Sparkles, Minus, Plus } from 'lucide-react';
-import { generateRecipeFromCart } from '../services/geminiService';
+import { CartItem } from '../types';
+import { ShoppingBag, X, Minus, Plus } from 'lucide-react';
 
 interface CartSummaryProps {
   cart: CartItem[];
@@ -11,24 +10,9 @@ interface CartSummaryProps {
 
 export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, onCheckout }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [recipe, setRecipe] = useState<RecipeResponse | null>(null);
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  const handleGenerateRecipe = async () => {
-    setIsGenerating(true);
-    setRecipe(null);
-    try {
-      const result = await generateRecipeFromCart(cart);
-      setRecipe(result);
-    } catch (e) {
-      alert("生成食谱失败，请重试。");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const handleCheckoutClick = () => {
       onCheckout();
@@ -87,44 +71,6 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, 
                   </div>
                 </div>
               ))}
-
-              {/* AI Recipe Section */}
-              <div className="mt-8 pt-6 border-t border-dashed border-slate-200">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                    <Sparkles size={18} className="text-purple-500" />
-                    大厨推荐
-                  </h3>
-                  {!recipe && (
-                     <button 
-                     onClick={handleGenerateRecipe}
-                     disabled={isGenerating}
-                     className="text-xs font-semibold bg-purple-50 text-purple-700 px-3 py-1.5 rounded-full hover:bg-purple-100 transition-colors disabled:opacity-50"
-                   >
-                     {isGenerating ? '思考中...' : '生成食谱'}
-                   </button>
-                  )}
-                </div>
-
-                {recipe && (
-                  <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-5 border border-purple-100">
-                    <h4 className="font-bold text-purple-900 mb-2">{recipe.title}</h4>
-                    <p className="text-sm text-purple-800 italic mb-4">{recipe.description}</p>
-                    
-                    <div className="text-sm text-purple-900 space-y-2">
-                        <p className="font-semibold text-xs uppercase tracking-wider text-purple-500">所需食材</p>
-                        <p>{recipe.ingredients.join('、')}</p>
-                        
-                        <p className="font-semibold text-xs uppercase tracking-wider text-purple-500 mt-3">烹饪步骤</p>
-                        <ol className="list-decimal list-inside space-y-1">
-                            {recipe.instructions.map((step, idx) => (
-                                <li key={idx}>{step}</li>
-                            ))}
-                        </ol>
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Footer Actions */}
