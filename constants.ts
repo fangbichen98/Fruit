@@ -5,56 +5,56 @@ export const INITIAL_PRODUCTS: Product[] = [
   { 
     id: '1', 
     name: '红富士苹果', 
-    image: 'https://images.unsplash.com/photo-1570913149827-d2ac84ab3f9a?auto=format&fit=crop&w=500&q=80', 
+    image: 'https://images.unsplash.com/photo-1570913149827-d2ac84ab3f9a?auto=format&fit=crop&w=800&q=80', 
     price: 5.5, 
     unit: '个' 
   },
   { 
     id: '2', 
     name: '进口香蕉', 
-    image: 'https://images.unsplash.com/photo-1571771896612-410b95098b3c?auto=format&fit=crop&w=500&q=80', 
+    image: 'https://images.unsplash.com/photo-1528825871115-3581a5387919?auto=format&fit=crop&w=800&q=80', 
     price: 3.5, 
     unit: '把' 
   },
   { 
     id: '3', 
     name: '巨峰葡萄', 
-    image: 'https://images.unsplash.com/photo-1596363505729-419056647c40?auto=format&fit=crop&w=500&q=80', 
+    image: 'https://images.unsplash.com/photo-1537640538965-175931b15d66?auto=format&fit=crop&w=800&q=80', 
     price: 18.0, 
     unit: '公斤' 
   },
   { 
     id: '4', 
     name: '赣南脐橙', 
-    image: 'https://images.unsplash.com/photo-1547514701-42782101795e?auto=format&fit=crop&w=500&q=80', 
+    image: 'https://images.unsplash.com/photo-1547514701-42782101795e?auto=format&fit=crop&w=800&q=80', 
     price: 8.8, 
     unit: '公斤' 
   },
   { 
     id: '5', 
     name: '丹东草莓', 
-    image: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?auto=format&fit=crop&w=500&q=80', 
+    image: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?auto=format&fit=crop&w=800&q=80', 
     price: 35.0, 
     unit: '盒' 
   },
   { 
     id: '6', 
     name: '牛油果', 
-    image: 'https://images.unsplash.com/photo-1523049673856-6468baca292f?auto=format&fit=crop&w=500&q=80', 
+    image: 'https://images.unsplash.com/photo-1519162808019-7de1623bb133?auto=format&fit=crop&w=800&q=80', 
     price: 9.9, 
     unit: '个' 
   },
   { 
     id: '7', 
     name: '麒麟西瓜', 
-    image: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=500&q=80', 
+    image: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=800&q=80', 
     price: 45.0, 
     unit: '个' 
   },
   { 
     id: '8', 
     name: '大台芒', 
-    image: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=500&q=80', 
+    image: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=800&q=80', 
     price: 12.0, 
     unit: '个' 
   },
