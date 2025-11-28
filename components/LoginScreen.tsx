@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User, Store, ArrowRight, Lock, UserPlus, LogIn, Github as Gift } from 'lucide-react';
+import { User, ArrowRight, Lock, UserPlus, LogIn, Github as Gift } from 'lucide-react';
 import { RegisteredUser, UserProfile } from '../types';
 
 interface LoginScreenProps {
@@ -11,7 +11,11 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onUserProfileFetch, users, onRegister }) => {
-  const [activeTab, setActiveTab] = useState<'shopper' | 'merchant'>('shopper');
+  // Check URL params on initialization to determine mode
+  const [activeTab, setActiveTab] = useState<'shopper' | 'merchant'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') === 'admin' ? 'merchant' : 'shopper';
+  });
   
   // Shopper State
   const [shopperMode, setShopperMode] = useState<'guest' | 'login' | 'register'>('guest');
@@ -100,29 +104,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onUserProfile
       </div>
 
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-slate-100 animate-in slide-in-from-bottom-4 duration-500">
-        <div className="flex border-b border-slate-100">
-          <button
-            onClick={() => setActiveTab('shopper')}
-            className={`flex-1 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 relative
-              ${activeTab === 'shopper' ? 'text-emerald-700 bg-emerald-50/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
-          >
-            <User size={18} /> 顾客入口
-            {activeTab === 'shopper' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500" />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('merchant')}
-            className={`flex-1 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 relative
-              ${activeTab === 'merchant' ? 'text-blue-700 bg-blue-50/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
-          >
-            <Store size={18} /> 商家入口
-            {activeTab === 'merchant' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />
-            )}
-          </button>
-        </div>
-
         <div className="p-8 min-h-[350px] flex flex-col justify-center">
           {activeTab === 'shopper' ? (
             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
