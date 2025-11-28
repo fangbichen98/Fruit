@@ -18,6 +18,13 @@ interface MerchantPanelProps {
 
 type DashboardRange = 'day' | 'week' | 'month' | 'year';
 
+// Helper for Date Formatting: YYYY-MM-DD HH:mm:ss
+const formatDate = (timestamp: number | string) => {
+  const d = new Date(timestamp);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 // --- Edit Order Modal Component ---
 const EditOrderModal: React.FC<{
   order: Order;
@@ -86,7 +93,11 @@ const EditOrderModal: React.FC<{
               {editedOrder.items.map(item => (
                 <div key={item.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
                    <div className="flex items-center gap-3">
-                     <img src={item.image} alt={item.name} className="w-10 h-10 rounded-md object-cover bg-white" />
+                     {item.image ? (
+                        <img src={item.image} alt={item.name} className="w-10 h-10 rounded-md object-cover bg-white" />
+                     ) : (
+                        <div className="w-10 h-10 rounded-md bg-slate-200 flex items-center justify-center text-xs">No Img</div>
+                     )}
                      <div>
                        <div className="text-sm font-medium text-slate-900">{item.name}</div>
                        <div className="text-xs text-slate-500">¥{item.price}/{item.unit}</div>
@@ -286,7 +297,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
     const bom = '\uFEFF'; 
     const headers = "订单号,下单时间,客户昵称,状态,商品列表,总金额(元)\n";
     const rows = filteredOrdersList.map(order => {
-        const date = new Date(order.timestamp).toLocaleString();
+        const date = formatDate(order.timestamp);
         const items = order.items.map(i => `${i.name}x${i.quantity}`).join(' | ');
         const status = order.status === 'completed' ? '已完成' : '待处理';
         return `${order.id},"${date}",${order.user.nickname},${status},"${items}",${order.total.toFixed(2)}`;
@@ -635,7 +646,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                                             <td className="p-5">
                                                 <div className="font-mono text-xs text-slate-500 mb-1">{order.id}</div>
                                                 <div className="text-sm font-medium text-slate-700">
-                                                    {new Date(order.timestamp).toLocaleString()}
+                                                    {formatDate(order.timestamp)}
                                                 </div>
                                                 <div className={`mt-1 inline-flex px-2 py-0.5 rounded text-[10px] font-medium ${order.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                                                     {order.status === 'completed' ? '已完成' : '待处理'}
@@ -720,7 +731,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                                         <span className="text-sm text-slate-600 font-mono bg-slate-100 px-2 py-1 rounded">{user.username}</span>
                                     </td>
                                     <td className="p-5">
-                                        <div className="text-sm text-slate-600">{new Date(user.joinDate).toLocaleString()}</div>
+                                        <div className="text-sm text-slate-600">{formatDate(user.joinDate)}</div>
                                     </td>
                                     <td className="p-5 text-center">
                                          <button 

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { INITIAL_PRODUCTS, INITIAL_ORDERS, INITIAL_USERS } from './constants';
 import { Product, CartItem, UserProfile, Order, RegisteredUser } from './types';
 import { ProductCard } from './components/ProductCard';
@@ -25,6 +25,83 @@ const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [users, setUsers] = useState<RegisteredUser[]>(INITIAL_USERS);
 
+  // --- Merchant Data Fetching ---
+  useEffect(() => {
+    if (userRole === 'merchant') {
+      const fetchMerchantData = async () => {
+        try {
+          // 1. Fetch Products
+          const { data: productsData, error: prodError } = await supabase
+            .from('products')
+            .select('*');
+          
+          let currentProducts = INITIAL_PRODUCTS;
+          
+          if (prodError) {
+            console.error('Fetching products failed, using mocks:', prodError);
+            // Fallback to INITIAL_PRODUCTS if table doesn't exist or error
+          } else if (productsData && productsData.length > 0) {
+            // Map Supabase data to Product interface
+            currentProducts = productsData.map((p: any) => ({
+              id: p.id.toString(),
+              name: p.name,
+              image: p.image || '', // Ensure fallback if null
+              price: Number(p.price),
+              unit: p.unit
+            }));
+            setProducts(currentProducts);
+          }
+
+          // 2. Fetch Orders
+          const { data: ordersData, error: ordError } = await supabase
+            .from('orders')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (ordError) {
+             console.error('Fetching orders failed:', ordError);
+             alert('获取订单列表失败，请检查控制台');
+          } else if (ordersData) {
+             const mappedOrders: Order[] = ordersData.map((o: any) => {
+               // Parse cart_items (JSONB)
+               // DB Format: [{ name: "...", num: ... }]
+               const rawItems = o.cart_items || [];
+               
+               // Enrich items with product details (image, price) for display
+               const items = Array.isArray(rawItems) ? rawItems.map((ri: any) => {
+                 const productMatch = currentProducts.find(p => p.name === ri.name);
+                 return {
+                   id: productMatch?.id || ri.name,
+                   name: ri.name,
+                   quantity: ri.num,
+                   image: productMatch?.image || '', // Fallback for UI
+                   price: productMatch?.price || 0,
+                   unit: productMatch?.unit || '份'
+                 } as CartItem;
+               }) : [];
+
+               return {
+                 id: o.id,
+                 user: o.user_info || { nickname: '未知用户', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Unknown' },
+                 items: items,
+                 total: o.total || 0, 
+                 timestamp: new Date(o.created_at).getTime(),
+                 status: o.status || 'completed'
+               };
+             });
+             setOrders(mappedOrders);
+          }
+
+        } catch (e) {
+          console.error("System Error during fetch:", e);
+        }
+      };
+
+      fetchMerchantData();
+    }
+  }, [userRole]);
+
+
   // Generic Product Update Logic (Shared state)
   const handleUpdateProduct = (id: string, field: keyof Product, value: any) => {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
@@ -42,17 +119,44 @@ const App: React.FC = () => {
     setProducts(prev => [...prev, newProduct]);
   };
 
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = async (id: string) => {
       if (window.confirm('确定要删除这个商品吗？此操作不可撤销。')) {
-          setProducts(prev => prev.filter(p => p.id !== id));
-          setCart(prev => prev.filter(c => c.id !== id)); 
+          try {
+             // Delete from DB
+             const { error } = await supabase.from('products').delete().eq('id', id);
+             if (error) {
+                 console.error('Delete product error:', error);
+                 // Assuming if table doesn't exist we just update local state
+                 if (error.code !== '42P01') { // 42P01 is undefined_table
+                     alert('删除商品失败');
+                     return;
+                 }
+             }
+             
+             // Update Local State
+             setProducts(prev => prev.filter(p => p.id !== id));
+             setCart(prev => prev.filter(c => c.id !== id)); 
+          } catch (e) {
+              console.error(e);
+          }
       }
   };
 
   // Order Management Logic
-  const handleDeleteOrder = (id: string) => {
+  const handleDeleteOrder = async (id: string) => {
     if (window.confirm('确定要删除此订单吗？')) {
-      setOrders(prev => prev.filter(o => o.id !== id));
+      try {
+        const { error } = await supabase.from('orders').delete().eq('id', id);
+        if (error) {
+            console.error('Delete order error:', error);
+            alert('删除订单失败');
+            return;
+        }
+        setOrders(prev => prev.filter(o => o.id !== id));
+      } catch (e) {
+          console.error(e);
+          alert('操作异常');
+      }
     }
   };
 
@@ -122,11 +226,17 @@ const App: React.FC = () => {
 
     const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     
+    // Format cart items for Supabase (JSON array: [{name: "苹果", num: 2}, ...])
+    const formattedCartItems = cart.map(item => ({
+      name: item.name,
+      num: item.quantity
+    }));
+
     // Create the order object for DB
     const orderData = {
       id: newId,
-      user_info: userProfile, // Sending user profile object
-      items: cart,            // Sending cart items array
+      user_info: userProfile,
+      cart_items: formattedCartItems, // Store structured JSON array here as requested
       total: total,
       timestamp: Date.now(),
       status: 'pending',
@@ -139,7 +249,7 @@ const App: React.FC = () => {
 
       if (error) {
         console.error('Supabase error:', error);
-        alert('提交失败，请查看控制台');
+        alert('提交订单失败，请稍后重试');
         return;
       }
 
@@ -159,7 +269,6 @@ const App: React.FC = () => {
 
     } catch (err) {
       console.error('Unexpected error:', err);
-      alert('发生意外错误');
     }
   };
 
