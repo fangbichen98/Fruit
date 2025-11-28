@@ -7,6 +7,12 @@ import { CartSummary } from './components/CartSummary';
 import { MerchantPanel } from './components/MerchantPanel';
 import { LoginScreen } from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+
+// --- Supabase Configuration ---
+const supabaseUrl = 'https://xysfaxlpbczibjsxjwjn.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5c2ZheGxwYmN6aWJqc3hqd2puIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTYwOTcsImV4cCI6MjA3OTg3MjA5N30.PaC7CN212lHAVIX1le0BtPu9-2gw-B-MDinhEOYEG98';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 type UserRole = 'shopper' | 'merchant' | null;
 
@@ -98,7 +104,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!userProfile || cart.length === 0) return;
 
     // Generate standardized ID: ORD-YYYYMMDD-XXXX
@@ -115,18 +121,46 @@ const App: React.FC = () => {
     const newId = `${todayPrefix}-${sequence}`;
 
     const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const newOrder: Order = {
+    
+    // Create the order object for DB
+    const orderData = {
       id: newId,
-      user: userProfile,
-      items: [...cart],
+      user_info: userProfile, // Sending user profile object
+      items: cart,            // Sending cart items array
       total: total,
       timestamp: Date.now(),
-      status: 'pending'
+      status: 'pending',
+      created_at: new Date().toISOString()
     };
 
-    setOrders(prev => [newOrder, ...prev]);
-    setCart([]);
-    alert(`支付成功！订单号: ${newId}\n商家已接单，请耐心等待配送。`);
+    try {
+      // Insert into Supabase 'orders' table
+      const { error } = await supabase.from('orders').insert(orderData);
+
+      if (error) {
+        console.error('Supabase error:', error);
+        alert('提交失败，请查看控制台');
+        return;
+      }
+
+      // Success: Update local state and UI
+      const newOrder: Order = {
+        id: newId,
+        user: userProfile,
+        items: [...cart],
+        total: total,
+        timestamp: Date.now(),
+        status: 'pending'
+      };
+
+      setOrders(prev => [newOrder, ...prev]);
+      setCart([]);
+      alert('提交成功');
+
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      alert('发生意外错误');
+    }
   };
 
   // Render Logic
@@ -187,7 +221,7 @@ const App: React.FC = () => {
                     <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                     <div className="relative z-10">
                         <h1 className="text-3xl font-bold mb-2">今日鲜果到货 🌿</h1>
-                        <p className="text-emerald-100">为您精选全球优质产地，全场满 ¥30 免校内配送费。</p>
+                        <p className="text-emerald-100">为您精选全球优质产地，全场满 ¥20 免校内配送费。</p>
                     </div>
                 </div>
                 
