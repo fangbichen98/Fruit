@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Product, Order, CartItem, RegisteredUser } from '../types';
-import { Settings, Save, Image as ImageIcon, LogOut, Trash2, Plus, Package, ClipboardList, Download, LayoutDashboard, TrendingUp, Filter, CalendarDays, Pencil, X, Minus, Users, MapPin, Phone } from 'lucide-react';
+import { Settings, Save, Image as ImageIcon, LogOut, Trash2, Plus, Package, ClipboardList, Download, LayoutDashboard, TrendingUp, Filter, CalendarDays, Pencil, X, Minus, Users, MapPin, Phone, Database } from 'lucide-react';
 
 interface MerchantPanelProps {
   products: Product[];
@@ -13,6 +13,7 @@ interface MerchantPanelProps {
   onDeleteOrder: (id: string) => void;
   onUpdateOrder: (order: Order) => void;
   onDeleteUser: (id: string) => void;
+  onInitializeData: () => void; // New prop
   onLogout: () => void;
 }
 
@@ -238,6 +239,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
     onDeleteOrder,
     onUpdateOrder,
     onDeleteUser,
+    onInitializeData,
     onLogout 
 }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'users'>('dashboard');
@@ -453,12 +455,21 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                         <Users size={16} /> 用户
                     </button>
                 </div>
-                <button 
-                    onClick={onLogout}
-                    className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors shrink-0"
-                >
-                    <LogOut size={16} />
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                    <button 
+                        onClick={onInitializeData}
+                        className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                        title="初始化默认数据到数据库"
+                    >
+                        <Database size={16} />
+                    </button>
+                    <button 
+                        onClick={onLogout}
+                        className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                    >
+                        <LogOut size={16} />
+                    </button>
+                </div>
             </div>
         </div>
 

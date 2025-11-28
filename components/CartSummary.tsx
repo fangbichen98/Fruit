@@ -112,7 +112,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, 
                   type="text" 
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="请输入宿舍区或学校门口 (必填)"
+                  placeholder="请输入宿舍区或校门口 (必填)"
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                 />
               </div>

@@ -45,7 +45,7 @@ const App: React.FC = () => {
             currentProducts = productsData.map((p: any) => ({
               id: p.id.toString(),
               name: p.name,
-              image: p.image || '', // Ensure fallback if null
+              image: p.image_url || '', // Corrected from p.image to p.image_url
               price: Number(p.price),
               unit: p.unit
             }));
@@ -110,10 +110,44 @@ const App: React.FC = () => {
     setCart(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
+  const handleInitializeData = async () => {
+    if (!window.confirm('确定要将 constants.ts 中的默认商品导入数据库吗？\n注意：这将写入 products 表。')) {
+        return;
+    }
+
+    try {
+        const payload = INITIAL_PRODUCTS.map(p => ({
+            id: Number(p.id), // Convert ID to number as requested
+            name: p.name,
+            price: p.price,
+            unit: p.unit,
+            image_url: p.image // Map local 'image' to DB 'image_url'
+        }));
+
+        const { error } = await supabase.from('products').insert(payload);
+
+        if (error) {
+            console.error('Import error:', error);
+            alert(`导入失败: ${error.message}`);
+        } else {
+            alert('数据导入成功！');
+            // Trigger a refresh logic if needed, or user can reload page
+        }
+    } catch (e: any) {
+        console.error('System error:', e);
+        alert(`系统错误: ${e.message}`);
+    }
+  };
+
   const handleAddProduct = async (name: string, price: number, unit: string, image: string) => {
     try {
         const { data, error } = await supabase.from('products').insert([
-            { name, price, unit, image }
+            { 
+                name, 
+                price, 
+                unit, 
+                image_url: image // Corrected: map image to image_url
+            }
         ]).select();
 
         if (error) {
@@ -130,7 +164,7 @@ const App: React.FC = () => {
              const newProduct: Product = {
                 id: newProd.id.toString(),
                 name: newProd.name,
-                image: newProd.image,
+                image: newProd.image_url, // Map back for local state
                 price: Number(newProd.price),
                 unit: newProd.unit
             };
@@ -142,7 +176,7 @@ const App: React.FC = () => {
                  const mapped = refreshedData.map((p: any) => ({
                     id: p.id.toString(),
                     name: p.name,
-                    image: p.image,
+                    image: p.image_url,
                     price: Number(p.price),
                     unit: p.unit
                  }));
@@ -400,6 +434,7 @@ const App: React.FC = () => {
                     onDeleteOrder={handleDeleteOrder}
                     onUpdateOrder={handleUpdateOrder}
                     onDeleteUser={handleDeleteUser}
+                    onInitializeData={handleInitializeData}
                     onLogout={() => {
                         setUserRole(null);
                         setUserProfile(null);
