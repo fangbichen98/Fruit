@@ -6,11 +6,11 @@ import { RegisteredUser, UserProfile } from '../types';
 interface LoginScreenProps {
   onLogin: (role: 'shopper' | 'merchant') => void;
   onUserProfileFetch: (profile: UserProfile) => void;
-  users: RegisteredUser[];
-  onRegister: (user: Omit<RegisteredUser, 'id' | 'joinDate'>) => boolean;
+  onShopperLogin: (username: string, password: string) => Promise<boolean>;
+  onRegister: (user: Omit<RegisteredUser, 'id' | 'joinDate'>) => Promise<boolean>;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onUserProfileFetch, users, onRegister }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onUserProfileFetch, onShopperLogin, onRegister }) => {
   // Check URL params on initialization to determine mode
   const [activeTab, setActiveTab] = useState<'shopper' | 'merchant'>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -23,10 +23,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onUserProfile
   const [shopperPassword, setShopperPassword] = useState('');
   const [shopperNickname, setShopperNickname] = useState('');
   const [shopperError, setShopperError] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Merchant State
   const [merchantPassword, setMerchantPassword] = useState('');
   const [merchantError, setMerchantError] = useState('');
+  const [secretClickCount, setSecretClickCount] = useState(0);
 
   // --- Merchant Logic ---
   const handleMerchantLogin = () => {
@@ -35,6 +38,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onUserProfile
     } else {
       setMerchantError('密码错误 (提示: 123456)');
     }
+  };
+
+  const handleTitleClick = () => {
+      const newCount = secretClickCount + 1;
+      setSecretClickCount(newCount);
+      if (newCount >= 5) {
+          setActiveTab('merchant');
+          setSecretClickCount(0);
+      }
   };
 
   // --- Shopper Logic ---
@@ -50,52 +62,56 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onUserProfile
     onLogin('shopper');
   };
 
-  const handleUserLogin = () => {
-    const user = users.find(u => u.username === shopperUsername && u.password === shopperPassword);
-    if (user) {
-      onUserProfileFetch({
-        nickname: user.nickname,
-        avatar: user.avatar,
-        username: user.username,
-        isGuest: false
-      });
-      onLogin('shopper');
-    } else {
-      setShopperError('账号或密码错误');
+  const handleUserLogin = async () => {
+    if (!shopperUsername || !shopperPassword) {
+        setShopperError('请输入账号和密码');
+        return;
+    }
+    
+    setIsLoggingIn(true);
+    setShopperError('');
+    
+    // Call Supabase Login in Parent
+    const success = await onShopperLogin(shopperUsername, shopperPassword);
+    
+    setIsLoggingIn(false);
+    
+    if (!success) {
+      setShopperError('登录失败，请检查账号密码');
     }
   };
 
-  const handleUserRegister = () => {
+  const handleUserRegister = async () => {
     if (!shopperUsername || !shopperPassword || !shopperNickname) {
       setShopperError('请填写所有必填项');
       return;
     }
 
+    setIsRegistering(true);
+    setShopperError('');
+    
     const seed = Math.random().toString(36).substring(7);
-    const success = onRegister({
+    const success = await onRegister({
       username: shopperUsername,
       password: shopperPassword,
       nickname: shopperNickname,
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${shopperNickname + seed}`
     });
 
+    setIsRegistering(false);
+
     if (success) {
-      // Auto login after register
-      onUserProfileFetch({
-        nickname: shopperNickname,
-        username: shopperUsername,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${shopperNickname + seed}`,
-        isGuest: false
-      });
-      onLogin('shopper');
-    } else {
-      setShopperError('该账号已存在');
+      // Auto login after register attempt
+      setIsLoggingIn(true);
+      await onShopperLogin(shopperUsername, shopperPassword);
+      setIsLoggingIn(false);
     }
+    // Error is handled in the onRegister function alerts
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
-      <div className="mb-8 text-center animate-in fade-in zoom-in duration-500">
+      <div className="mb-8 text-center animate-in fade-in zoom-in duration-500 cursor-pointer select-none" onClick={handleTitleClick}>
         <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-sm">
           🍋
         </div>
@@ -176,9 +192,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onUserProfile
                   {shopperError && <p className="text-red-500 text-sm font-medium">⚠️ {shopperError}</p>}
                   <button
                     onClick={handleUserLogin}
-                    className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-2"
+                    disabled={isLoggingIn}
+                    className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
                   >
-                     <LogIn size={18} /> 登录
+                     {isLoggingIn ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <LogIn size={18} />} 
+                     {isLoggingIn ? '登录中...' : '登录'}
                   </button>
                 </div>
               )}
@@ -219,9 +237,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onUserProfile
                   {shopperError && <p className="text-red-500 text-sm font-medium">⚠️ {shopperError}</p>}
                   <button
                     onClick={handleUserRegister}
-                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-2"
+                    disabled={isRegistering}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                     <UserPlus size={18} /> 注册并登录
+                     {isRegistering ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <UserPlus size={18} />} 
+                     {isRegistering ? '注册中...' : '注册并登录'}
                   </button>
                 </div>
               )}

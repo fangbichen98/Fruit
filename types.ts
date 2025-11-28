@@ -12,10 +12,11 @@ export interface CartItem extends Product {
 }
 
 export interface UserProfile {
+  id?: string; // Database ID for Registered Users
   nickname: string;
   avatar: string;
-  isGuest?: boolean; // Track if user is guest or registered
-  username?: string; // Link to registered account
+  isGuest?: boolean; 
+  username?: string; 
 }
 
 export interface RegisteredUser {
@@ -34,8 +35,9 @@ export interface Order {
   total: number;
   timestamp: number;
   status: 'completed' | 'pending';
-  address?: string; // Added address field
-  phone?: string;   // Added phone field
+  address?: string; 
+  phone?: string;
+  userId?: string; // Optional field for linking
 }
 
 export interface RecipeResponse {

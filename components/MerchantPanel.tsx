@@ -1,7 +1,13 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Order, CartItem, RegisteredUser } from '../types';
-import { Settings, Save, Image as ImageIcon, LogOut, Trash2, Plus, Package, ClipboardList, Download, LayoutDashboard, TrendingUp, Filter, CalendarDays, Pencil, X, Minus, Users, MapPin, Phone, Database } from 'lucide-react';
+import { Settings, Save, Image as ImageIcon, LogOut, Trash2, Plus, Package, ClipboardList, Download, LayoutDashboard, TrendingUp, Filter, CalendarDays, Pencil, X, Minus, Users, MapPin, Phone, Database, MessageSquare, CheckCircle } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+
+// --- Supabase Configuration ---
+const supabaseUrl = 'https://xysfaxlpbczibjsxjwjn.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5c2ZheGxwYmN6aWJqc3hqd2puIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTYwOTcsImV4cCI6MjA3OTg3MjA5N30.PaC7CN212lHAVIX1le0BtPu9-2gw-B-MDinhEOYEG98';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface MerchantPanelProps {
   products: Product[];
@@ -14,6 +20,15 @@ interface MerchantPanelProps {
   onUpdateOrder: (order: Order) => void;
   onDeleteUser: (id: string) => void;
   onLogout: () => void;
+}
+
+interface Feedback {
+  id: string;
+  user_id: string;
+  order_id: string;
+  content: string;
+  status: 'pending' | 'resolved';
+  created_at: string;
 }
 
 type DashboardRange = 'day' | 'week' | 'month' | 'year';
@@ -34,6 +49,18 @@ const AddProductModal: React.FC<{
     const [price, setPrice] = useState('');
     const [unit, setUnit] = useState('份');
     const [image, setImage] = useState('');
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImage(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     const handleSubmit = () => {
         if (!name || !price || !unit) {
@@ -70,8 +97,27 @@ const AddProductModal: React.FC<{
                         </div>
                     </div>
                      <div>
-                        <label className="text-xs font-semibold text-slate-500 uppercase">图片 URL (可选)</label>
-                        <input type="text" value={image} onChange={e => setImage(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://..." />
+                        <label className="text-xs font-semibold text-slate-500 uppercase">商品图片</label>
+                        <div 
+                            className="mt-1 w-full h-32 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-blue-400 transition-colors relative overflow-hidden"
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            {image ? (
+                                <img src={image} alt="Preview" className="w-full h-full object-cover" />
+                            ) : (
+                                <>
+                                    <ImageIcon className="text-slate-400 mb-1" size={24} />
+                                    <span className="text-xs text-slate-500">点击上传图片</span>
+                                </>
+                            )}
+                            <input 
+                                ref={fileInputRef}
+                                type="file" 
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleFileChange}
+                            />
+                        </div>
                     </div>
                 </div>
                 <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
@@ -240,11 +286,55 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
     onDeleteUser,
     onLogout 
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'users'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'users' | 'feedbacks'>('dashboard');
   const [filterDate, setFilterDate] = useState<string>(''); // YYYY-MM-DD
   const [dashboardRange, setDashboardRange] = useState<DashboardRange>('week');
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [showAddProduct, setShowAddProduct] = useState(false);
+  
+  // Feedback State
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
+
+  // Fetch Feedbacks when tab is active
+  useEffect(() => {
+    if (activeTab === 'feedbacks') {
+        const fetchFeedbacks = async () => {
+            setLoadingFeedbacks(true);
+            try {
+                const { data, error } = await supabase
+                    .from('feedbacks')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                if (data) setFeedbacks(data as Feedback[]);
+            } catch (e) {
+                console.error("Error fetching feedbacks:", e);
+                alert("获取反馈列表失败");
+            } finally {
+                setLoadingFeedbacks(false);
+            }
+        };
+        fetchFeedbacks();
+    }
+  }, [activeTab]);
+
+  const handleResolveFeedback = async (id: string) => {
+      try {
+          const { error } = await supabase
+            .from('feedbacks')
+            .update({ status: 'resolved' })
+            .eq('id', id);
+
+          if (error) throw error;
+
+          // Update local state
+          setFeedbacks(prev => prev.map(f => f.id === id ? { ...f, status: 'resolved' } : f));
+      } catch (e: any) {
+          alert('操作失败: ' + e.message);
+      }
+  };
   
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
     const file = e.target.files?.[0];
@@ -421,7 +511,9 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                 <p className="text-slate-500 text-sm mt-1">
                     {activeTab === 'dashboard' ? '查看经营数据与销售趋势' : 
                      activeTab === 'products' ? '管理您的库存、定价及展示图片' : 
-                     activeTab === 'orders' ? '查看顾客订单与配送信息' : '管理注册用户名单'}
+                     activeTab === 'orders' ? '查看顾客订单与配送信息' : 
+                     activeTab === 'feedbacks' ? '处理顾客的售后反馈信息' :
+                     '管理注册用户名单'}
                 </p>
             </div>
             
@@ -445,6 +537,12 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                     >
                         <ClipboardList size={16} /> 订单
                         {orders.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full ml-1">{orders.length}</span>}
+                    </button>
+                     <button 
+                        onClick={() => setActiveTab('feedbacks')}
+                         className={`flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'feedbacks' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <MessageSquare size={16} /> 售后
                     </button>
                      <button 
                         onClick={() => setActiveTab('users')}
@@ -862,6 +960,81 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                             {users.length === 0 && (
                                 <tr>
                                     <td colSpan={4} className="p-12 text-center text-slate-400">暂无注册用户</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                 </div>
+            </div>
+        )}
+
+        {/* --- FEEDBACKS VIEW --- */}
+        {activeTab === 'feedbacks' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-300">
+                 <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2"><MessageSquare size={18} /> 售后反馈处理</h3>
+                    {loadingFeedbacks && <span className="text-xs text-slate-500">刷新中...</span>}
+                 </div>
+                 <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                         <thead className="bg-white border-b border-slate-100 text-slate-500">
+                            <tr>
+                                <th className="p-5 text-xs font-bold uppercase tracking-wider">提交时间</th>
+                                <th className="p-5 text-xs font-bold uppercase tracking-wider">关联订单 / 用户</th>
+                                <th className="p-5 text-xs font-bold uppercase tracking-wider w-1/3">反馈内容</th>
+                                <th className="p-5 text-xs font-bold uppercase tracking-wider text-center">状态</th>
+                                <th className="p-5 text-xs font-bold uppercase tracking-wider text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {feedbacks.map(feedback => {
+                                const user = users.find(u => u.id === feedback.user_id);
+                                return (
+                                    <tr key={feedback.id} className="hover:bg-slate-50">
+                                        <td className="p-5 text-sm text-slate-600">
+                                            {formatDate(feedback.created_at)}
+                                        </td>
+                                        <td className="p-5">
+                                            <div className="text-xs font-mono text-slate-500 mb-1">ORD: {feedback.order_id}</div>
+                                            <div className="flex items-center gap-2">
+                                                 <div className="w-5 h-5 rounded-full bg-slate-200 overflow-hidden">
+                                                    {user && <img src={user.avatar} className="w-full h-full object-cover" />}
+                                                 </div>
+                                                 <span className="text-sm font-medium text-slate-700">
+                                                     {user ? user.nickname : '未知用户'}
+                                                 </span>
+                                            </div>
+                                        </td>
+                                        <td className="p-5">
+                                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{feedback.content}</p>
+                                        </td>
+                                        <td className="p-5 text-center">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                feedback.status === 'resolved' 
+                                                ? 'bg-green-100 text-green-700' 
+                                                : 'bg-orange-100 text-orange-700'
+                                            }`}>
+                                                {feedback.status === 'resolved' ? '已解决' : '待处理'}
+                                            </span>
+                                        </td>
+                                        <td className="p-5 text-center">
+                                            {feedback.status === 'pending' ? (
+                                                <button 
+                                                    onClick={() => handleResolveFeedback(feedback.id)}
+                                                    className="flex items-center gap-1 mx-auto px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg text-xs font-medium transition-colors"
+                                                >
+                                                    <CheckCircle size={14} /> 标记为已解决
+                                                </button>
+                                            ) : (
+                                                <span className="text-xs text-slate-400">已处理</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {!loadingFeedbacks && feedbacks.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="p-12 text-center text-slate-400">暂无反馈记录</td>
                                 </tr>
                             )}
                         </tbody>

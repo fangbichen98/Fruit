@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { INITIAL_USERS } from './constants';
 import { Product, CartItem, UserProfile, Order, RegisteredUser } from './types';
 import { ProductCard } from './components/ProductCard';
 import { CartSummary } from './components/CartSummary';
 import { MerchantPanel } from './components/MerchantPanel';
 import { LoginScreen } from './components/LoginScreen';
-import { LogOut } from 'lucide-react';
+import { UserOrdersModal } from './components/UserOrdersModal'; // Import new component
+import { LogOut, ClipboardList } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- Supabase Configuration ---
@@ -24,39 +24,63 @@ const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [users, setUsers] = useState<RegisteredUser[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<RegisteredUser[]>([]);
+  
+  // UI State
+  const [showUserOrders, setShowUserOrders] = useState(false);
 
-  // --- Global Data Fetching (Products) ---
+  // --- Global Data Fetching (Products & Users) ---
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchInitialData = async () => {
       try {
-        const { data, error } = await supabase
+        // 1. Fetch Products
+        const { data: prodData, error: prodError } = await supabase
           .from('products')
           .select('*')
           .order('id', { ascending: true });
 
-        if (error) {
-          console.error('Error fetching products:', error);
-          return;
-        }
-
-        if (data) {
-          const mappedProducts: Product[] = data.map((p: any) => ({
+        if (prodError) console.error('Error fetching products:', prodError.message);
+        if (prodData) {
+          const mappedProducts: Product[] = prodData.map((p: any) => ({
             id: p.id.toString(),
             name: p.name,
-            image: p.image_url || '', // Map DB field 'image_url' to UI field 'image'
+            image: p.image_url || '',
             price: Number(p.price),
             unit: p.unit
           }));
           setProducts(mappedProducts);
         }
+
+        // 2. Fetch Users (Only for Merchant Panel display, not for login auth)
+        if (userRole === 'merchant') {
+            const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+            if (userError) {
+                console.error('Error fetching users:', userError.message);
+            }
+            if (userData) {
+                const mappedUsers: RegisteredUser[] = userData.map((u: any) => ({
+                    id: u.id,
+                    username: u.username,
+                    password: u.password,
+                    nickname: u.nickname,
+                    avatar: u.avatar || '',
+                    joinDate: new Date(u.created_at).getTime()
+                }));
+                setUsers(mappedUsers);
+            }
+        }
+
       } catch (e) {
-        console.error('System error fetching products:', e);
+        console.error('System error fetching initial data:', e);
       }
     };
 
-    fetchProducts();
-  }, []);
+    fetchInitialData();
+  }, [userRole]); // Re-fetch when role changes (e.g. merchant login)
 
   // --- Merchant Data Fetching (Orders) ---
   useEffect(() => {
@@ -70,22 +94,20 @@ const App: React.FC = () => {
             .order('created_at', { ascending: false });
 
           if (ordError) {
-             console.error('Fetching orders failed:', ordError);
-             alert('获取订单列表失败，请检查控制台');
+             console.error('Fetching orders failed:', ordError.message);
           } else if (ordersData) {
              const mappedOrders: Order[] = ordersData.map((o: any) => {
                // Parse cart_items (JSONB)
-               // DB Format: [{ name: "...", num: ... }]
                const rawItems = o.cart_items || [];
                
-               // Enrich items with product details (image, price) from current products state
+               // Enrich items with product details
                const items = Array.isArray(rawItems) ? rawItems.map((ri: any) => {
                  const productMatch = products.find(p => p.name === ri.name);
                  return {
                    id: productMatch?.id || ri.name,
                    name: ri.name,
                    quantity: ri.num,
-                   image: productMatch?.image || '', // Fallback if product deleted
+                   image: productMatch?.image || '', 
                    price: productMatch?.price || 0,
                    unit: productMatch?.unit || '份'
                  } as CartItem;
@@ -111,27 +133,22 @@ const App: React.FC = () => {
 
       fetchOrders();
     }
-  }, [userRole, products]); // Re-run when products load so orders display correct images
+  }, [userRole, products]); 
 
 
-  // Generic Product Update Logic (Shared state + DB persistence)
+  // Generic Product Update Logic
   const handleUpdateProduct = async (id: string, field: keyof Product, value: any) => {
-    // 1. Optimistic Update (Local State)
     setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
     setCart(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
 
-    // 2. DB Update
     try {
-      // Map 'image' field back to 'image_url' for DB
       const dbField = field === 'image' ? 'image_url' : field;
       const { error } = await supabase
         .from('products')
         .update({ [dbField]: value })
         .eq('id', id);
 
-      if (error) {
-        console.error('Supabase update failed:', error);
-      }
+      if (error) console.error('Supabase update failed:', error.message);
     } catch (e) {
       console.error('System error updating product:', e);
     }
@@ -140,23 +157,15 @@ const App: React.FC = () => {
   const handleAddProduct = async (name: string, price: number, unit: string, image: string) => {
     try {
         const { data, error } = await supabase.from('products').insert([
-            { 
-                name, 
-                price, 
-                unit, 
-                image_url: image
-            }
+            { name, price, unit, image_url: image }
         ]).select();
 
         if (error) {
-            console.error('Add product error:', error);
             alert(`添加商品失败: ${error.message}`);
             return;
         }
 
         alert('商品添加成功！');
-        
-        // Refresh local state from DB response
         if (data && data.length > 0) {
             const newProd = data[0];
              const newProduct: Product = {
@@ -169,7 +178,6 @@ const App: React.FC = () => {
             setProducts(prev => [...prev, newProduct]);
         }
     } catch (e: any) {
-        console.error('System error:', e);
         alert(`系统错误: ${e.message}`);
     }
   };
@@ -177,17 +185,11 @@ const App: React.FC = () => {
   const handleDeleteProduct = async (id: string) => {
       if (window.confirm('确定要删除这个商品吗？此操作不可撤销。')) {
           try {
-             // Delete from DB
              const { error } = await supabase.from('products').delete().eq('id', id);
              if (error) {
-                 console.error('Delete product error:', error);
-                 if (error.code !== '42P01') { 
-                     alert('删除商品失败');
-                     return;
-                 }
+                 alert('删除商品失败: ' + error.message);
+                 return;
              }
-             
-             // Update Local State
              setProducts(prev => prev.filter(p => p.id !== id));
              setCart(prev => prev.filter(c => c.id !== id)); 
           } catch (e) {
@@ -202,68 +204,120 @@ const App: React.FC = () => {
       try {
         const { error } = await supabase.from('orders').delete().eq('id', id);
         if (error) {
-            console.error('Delete order error:', error);
-            alert('删除订单失败');
+            alert('删除订单失败: ' + error.message);
             return;
         }
         setOrders(prev => prev.filter(o => o.id !== id));
       } catch (e) {
-          console.error(e);
           alert('操作异常');
       }
     }
   };
 
   const handleUpdateOrder = async (updatedOrder: Order) => {
-    // Optimistic Update
     setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-
     try {
-        // Update in DB
         const { error } = await supabase
             .from('orders')
             .update({ 
                 status: updatedOrder.status,
                 address: updatedOrder.address,
                 phone: updatedOrder.phone,
-                // Update items in case they were modified in modal
                 cart_items: updatedOrder.items.map(i => ({ name: i.name, num: i.quantity })),
                 total: updatedOrder.total,
-                // Update user info if nickname changed
                 user_info: updatedOrder.user
             })
             .eq('id', updatedOrder.id);
-
-        if (error) {
-            console.error('Update order failed:', error);
-            // Optionally revert local state here or alert user
-        }
+        if (error) console.error('Update order failed:', error.message);
     } catch (e) {
         console.error('System error updating order:', e);
     }
   };
 
-  // User Management Logic
-  const handleRegisterUser = (newUser: Omit<RegisteredUser, 'id' | 'joinDate'>) => {
-      // Check if username exists
-      if (users.some(u => u.username === newUser.username)) {
+  // --- Auth Logic (Login & Register) ---
+
+  const handleShopperLogin = async (username: string, password: string): Promise<boolean> => {
+      try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('username', username)
+            .single();
+          
+          if (error || !data) {
+              alert('账号不存在或网络错误');
+              return false;
+          }
+
+          if (data.password !== password) {
+              alert('密码错误');
+              return false;
+          }
+
+          // Login Success (Include ID from database)
+          setUserProfile({
+              id: data.id, 
+              nickname: data.nickname,
+              avatar: data.avatar,
+              username: data.username,
+              isGuest: false
+          });
+          setUserRole('shopper');
+          return true;
+
+      } catch (e: any) {
+          console.error('Login error:', e);
+          alert('登录系统异常: ' + e.message);
           return false;
       }
-      const user: RegisteredUser = {
-          ...newUser,
-          id: `u${Date.now()}`,
-          joinDate: Date.now()
-      };
-      setUsers(prev => [...prev, user]);
-      return true;
   };
 
-  const handleDeleteUser = (id: string) => {
-      if (window.confirm('确定要删除此用户吗？')) {
-          setUsers(prev => prev.filter(u => u.id !== id));
+  const handleRegisterUser = async (newUser: Omit<RegisteredUser, 'id' | 'joinDate'>) => {
+      const id = Date.now().toString(); // Generate unique string ID
+      
+      try {
+        const { error } = await supabase.from('users').insert([{
+            id: id,
+            username: newUser.username,
+            password: newUser.password,
+            nickname: newUser.nickname,
+            avatar: newUser.avatar
+        }]);
+
+        if (error) {
+            if (error.code === '23505') { // Postgres unique_violation code
+                alert('该账号已被注册，请更换账号名');
+            } else {
+                alert('注册失败: ' + error.message);
+            }
+            return false;
+        }
+
+        alert('注册成功！正在为您自动登录...');
+        return true;
+
+      } catch (e: any) {
+          console.error('System error registering:', e);
+          alert('系统错误: ' + e.message);
+          return false;
       }
   };
 
+  const handleDeleteUser = async (id: string) => {
+      if (window.confirm('确定要删除此用户吗？')) {
+          try {
+             const { error } = await supabase.from('users').delete().eq('id', id);
+             if (error) {
+                 alert('删除用户失败: ' + error.message);
+                 return;
+             }
+             setUsers(prev => prev.filter(u => u.id !== id));
+          } catch (e) {
+              console.error(e);
+              alert('系统异常');
+          }
+      }
+  };
 
   // Shopper Logic
   const addToCart = (product: Product) => {
@@ -290,47 +344,39 @@ const App: React.FC = () => {
   const handleCheckout = async (address: string, phone: string) => {
     if (!userProfile || cart.length === 0) return;
 
-    // Generate robust ID: ORD-YYYYMMDD-HHMMSS-RRR (Random 3 digits)
-    // This prevents duplicate keys regardless of how many users are active or if order list is empty locally
     const now = new Date();
-    const dateStr = now.toISOString().slice(0,10).replace(/-/g, ''); // 20231128
-    const timeStr = now.toTimeString().slice(0,8).replace(/:/g, ''); // 143005
+    const dateStr = now.toISOString().slice(0,10).replace(/-/g, ''); 
+    const timeStr = now.toTimeString().slice(0,8).replace(/:/g, ''); 
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     const newId = `ORD-${dateStr}-${timeStr}-${random}`;
 
     const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     
-    // Format cart items for Supabase (JSON array: [{name: "苹果", num: 2}, ...])
     const formattedCartItems = cart.map(item => ({
       name: item.name,
       num: item.quantity
     }));
 
-    // Create the order object for DB
     const orderData = {
       id: newId,
       user_info: userProfile,
       cart_items: formattedCartItems, 
       total: total,
-      // REMOVED 'timestamp' field to avoid [object Object] error if column missing
       status: 'pending',
       address: address,
       phone: phone,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      user_id: userProfile.id || null // Link to user ID if available
     };
 
     try {
-      // Insert into Supabase 'orders' table
       const { error } = await supabase.from('orders').insert(orderData);
 
       if (error) {
-        console.error('Supabase error:', error);
-        // Alert specific message instead of object
         alert('提交订单失败: ' + (error.message || '未知错误'));
         return;
       }
 
-      // Success: Update local state and UI
       const newOrder: Order = {
         id: newId,
         user: userProfile,
@@ -352,13 +398,12 @@ const App: React.FC = () => {
     }
   };
 
-  // Render Logic
   if (!userRole) {
     return (
         <LoginScreen 
             onLogin={(role) => setUserRole(role)} 
             onUserProfileFetch={(profile) => setUserProfile(profile)}
-            users={users}
+            onShopperLogin={handleShopperLogin}
             onRegister={handleRegisterUser}
         />
     );
@@ -381,10 +426,21 @@ const App: React.FC = () => {
             
             <div className="flex items-center gap-4">
                 {userRole === 'shopper' && userProfile && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
-                        <img src={userProfile.avatar} alt="avatar" className="w-5 h-5 rounded-full" />
-                        <span className="font-medium max-w-[100px] truncate">{userProfile.nickname}</span>
-                        {userProfile.isGuest && <span className="text-[10px] bg-gray-200 text-gray-500 px-1 rounded">游客</span>}
+                    <div className="flex items-center gap-2">
+                        {/* My Orders Button */}
+                        {!userProfile.isGuest && (
+                          <button 
+                             onClick={() => setShowUserOrders(true)}
+                             className="flex items-center gap-1.5 bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm"
+                          >
+                             <ClipboardList size={14} /> 订单
+                          </button>
+                        )}
+
+                        <div className="hidden sm:flex items-center gap-2 text-sm text-slate-600 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+                            <img src={userProfile.avatar} alt="avatar" className="w-5 h-5 rounded-full" />
+                            <span className="font-medium max-w-[100px] truncate">{userProfile.nickname}</span>
+                        </div>
                     </div>
                 )}
                 <button 
@@ -463,6 +519,14 @@ const App: React.FC = () => {
             updateQuantity={updateQuantity} 
             onCheckout={handleCheckout}
         />
+      )}
+
+      {/* User Orders Modal */}
+      {showUserOrders && userProfile?.id && (
+          <UserOrdersModal 
+            userId={userProfile.id} 
+            onClose={() => setShowUserOrders(false)} 
+          />
       )}
     </div>
   );
