@@ -1,16 +1,18 @@
+
 import React, { useState } from 'react';
 import { CartItem } from '../types';
-import { ShoppingBag, X, Minus, Plus, MapPin } from 'lucide-react';
+import { ShoppingBag, X, Minus, Plus, MapPin, Phone } from 'lucide-react';
 
 interface CartSummaryProps {
   cart: CartItem[];
   updateQuantity: (id: string, delta: number) => void;
-  onCheckout: (address: string) => void;
+  onCheckout: (address: string, phone: string) => void;
 }
 
 export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, onCheckout }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -20,9 +22,14 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, 
         alert('请填写收货地址');
         return;
       }
-      onCheckout(address);
+      if (!phone.trim()) {
+        alert('请填写联系电话');
+        return;
+      }
+      onCheckout(address, phone);
       setIsOpen(false);
       setAddress(''); // Reset address after checkout
+      setPhone('');   // Reset phone after checkout
   };
 
   if (count === 0 && !isOpen) return null;
@@ -81,6 +88,21 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, 
 
             {/* Footer Actions */}
             <div className="p-5 border-t border-slate-100 bg-slate-50 space-y-4">
+              
+              {/* Phone Input */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                  <Phone size={16} className="text-slate-400" /> 联系电话
+                </label>
+                <input 
+                  type="tel" 
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="请输入手机号 (必填)"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                />
+              </div>
+
               {/* Address Input */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
@@ -90,7 +112,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, 
                   type="text" 
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="请输入宿舍号或详细地址 (必填)"
+                  placeholder="请输入宿舍区或学校门口 (必填)"
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                 />
               </div>
@@ -102,9 +124,9 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, 
               <button 
                 className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold text-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleCheckoutClick}
-                disabled={!address.trim()}
+                disabled={!address.trim() || !phone.trim()}
               >
-                {address.trim() ? '立即结算' : '请填写地址'}
+                {address.trim() && phone.trim() ? '立即结算' : '请填写完整信息'}
               </button>
             </div>
           </div>

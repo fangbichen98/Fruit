@@ -1,14 +1,14 @@
 
 import React, { useState, useMemo } from 'react';
 import { Product, Order, CartItem, RegisteredUser } from '../types';
-import { Settings, Save, Image as ImageIcon, LogOut, Trash2, Plus, Package, ClipboardList, Download, LayoutDashboard, TrendingUp, Filter, CalendarDays, Pencil, X, Minus, Users, MapPin } from 'lucide-react';
+import { Settings, Save, Image as ImageIcon, LogOut, Trash2, Plus, Package, ClipboardList, Download, LayoutDashboard, TrendingUp, Filter, CalendarDays, Pencil, X, Minus, Users, MapPin, Phone } from 'lucide-react';
 
 interface MerchantPanelProps {
   products: Product[];
   orders: Order[];
   users: RegisteredUser[];
   onUpdateProduct: (id: string, field: keyof Product, value: any) => void;
-  onAddProduct: () => void;
+  onAddProduct: (name: string, price: number, unit: string, image: string) => void;
   onDeleteProduct: (id: string) => void;
   onDeleteOrder: (id: string) => void;
   onUpdateOrder: (order: Order) => void;
@@ -23,6 +23,64 @@ const formatDate = (timestamp: number | string) => {
   const d = new Date(timestamp);
   const pad = (n: number) => n.toString().padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
+// --- Add Product Modal Component ---
+const AddProductModal: React.FC<{
+    onClose: () => void;
+    onAdd: (name: string, price: number, unit: string, image: string) => void;
+}> = ({ onClose, onAdd }) => {
+    const [name, setName] = useState('');
+    const [price, setPrice] = useState('');
+    const [unit, setUnit] = useState('份');
+    const [image, setImage] = useState('');
+
+    const handleSubmit = () => {
+        if (!name || !price || !unit) {
+            alert('请填写必要信息');
+            return;
+        }
+        const finalImage = image || 'https://images.unsplash.com/photo-1615484477778-ca3b77940c25?auto=format&fit=crop&w=500&q=80';
+        onAdd(name, parseFloat(price), unit, finalImage);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-in zoom-in-95 duration-200 overflow-hidden">
+                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 className="font-bold text-slate-800">添加新商品</h3>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full text-slate-500">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="text-xs font-semibold text-slate-500 uppercase">商品名称</label>
+                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如：香甜玉米" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                             <label className="text-xs font-semibold text-slate-500 uppercase">价格 (¥)</label>
+                             <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00" />
+                        </div>
+                        <div>
+                             <label className="text-xs font-semibold text-slate-500 uppercase">单位</label>
+                             <input type="text" value={unit} onChange={e => setUnit(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="个/盒/斤" />
+                        </div>
+                    </div>
+                     <div>
+                        <label className="text-xs font-semibold text-slate-500 uppercase">图片 URL (可选)</label>
+                        <input type="text" value={image} onChange={e => setImage(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://..." />
+                    </div>
+                </div>
+                <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                    <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-200 rounded-lg">取消</button>
+                    <button onClick={handleSubmit} className="px-6 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">确认添加</button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // --- Edit Order Modal Component ---
@@ -77,14 +135,26 @@ const EditOrderModal: React.FC<{
             </div>
           </div>
 
-          <div>
-             <label className="text-xs font-semibold text-slate-500 uppercase">收货人昵称</label>
-             <input 
-                type="text" 
-                value={editedOrder.user.nickname}
-                onChange={(e) => setEditedOrder({...editedOrder, user: {...editedOrder.user, nickname: e.target.value}})}
-                className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
-             />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+                 <label className="text-xs font-semibold text-slate-500 uppercase">收货人昵称</label>
+                 <input 
+                    type="text" 
+                    value={editedOrder.user.nickname}
+                    onChange={(e) => setEditedOrder({...editedOrder, user: {...editedOrder.user, nickname: e.target.value}})}
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+                 />
+            </div>
+            <div>
+                 <label className="text-xs font-semibold text-slate-500 uppercase">联系电话</label>
+                 <input 
+                    type="text" 
+                    value={editedOrder.phone || ''}
+                    onChange={(e) => setEditedOrder({...editedOrder, phone: e.target.value})}
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+                    placeholder="请输入电话"
+                 />
+            </div>
           </div>
 
           <div>
@@ -174,6 +244,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
   const [filterDate, setFilterDate] = useState<string>(''); // YYYY-MM-DD
   const [dashboardRange, setDashboardRange] = useState<DashboardRange>('week');
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [showAddProduct, setShowAddProduct] = useState(false);
   
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
     const file = e.target.files?.[0];
@@ -306,13 +377,14 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
   const downloadOrdersCSV = () => {
     // BOM for Excel to read UTF-8 correctly
     const bom = '\uFEFF'; 
-    const headers = "订单号,下单时间,客户昵称,收货地址,状态,商品列表,总金额(元)\n";
+    const headers = "订单号,下单时间,客户昵称,联系电话,收货地址,状态,商品列表,总金额(元)\n";
     const rows = filteredOrdersList.map(order => {
         const date = formatDate(order.timestamp);
         const items = order.items.map(i => `${i.name}x${i.quantity}`).join(' | ');
         const status = order.status === 'completed' ? '已完成' : '待处理';
         const address = order.address ? order.address.replace(/,/g, ' ') : ''; // Clean address for CSV
-        return `${order.id},"${date}",${order.user.nickname},"${address}",${status},"${items}",${order.total.toFixed(2)}`;
+        const phone = order.phone || '';
+        return `${order.id},"${date}",${order.user.nickname},"${phone}","${address}",${status},"${items}",${order.total.toFixed(2)}`;
     }).join("\n");
 
     const csvContent = bom + headers + rows;
@@ -325,6 +397,9 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
 
   return (
     <div className="p-4 sm:p-6 pb-24 max-w-6xl mx-auto">
+        {showAddProduct && (
+            <AddProductModal onClose={() => setShowAddProduct(false)} onAdd={onAddProduct} />
+        )}
         {editingOrder && (
             <EditOrderModal 
                 order={editingOrder} 
@@ -591,7 +666,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                 {/* Add Product Button */}
                 <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-center">
                     <button 
-                        onClick={onAddProduct}
+                        onClick={() => setShowAddProduct(true)}
                         className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-all shadow-sm active:scale-95"
                     >
                         <Plus size={18} />
@@ -669,6 +744,11 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                                                     <img src={order.user.avatar} className="w-8 h-8 rounded-full bg-slate-100" alt="avatar" />
                                                     <div>
                                                         <div className="text-sm font-medium text-slate-900">{order.user.nickname}</div>
+                                                        {order.phone && (
+                                                            <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                                                                <Phone size={10} /> {order.phone}
+                                                            </div>
+                                                        )}
                                                         {order.address && (
                                                             <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1 max-w-[150px] truncate" title={order.address}>
                                                                 <MapPin size={10} /> {order.address}

@@ -87,7 +87,8 @@ const App: React.FC = () => {
                  total: o.total || 0, 
                  timestamp: new Date(o.created_at).getTime(),
                  status: o.status || 'completed',
-                 address: o.address || '' // Read address from DB
+                 address: o.address || '', // Read address from DB
+                 phone: o.phone || '' // Read phone from DB
                };
              });
              setOrders(mappedOrders);
@@ -109,15 +110,49 @@ const App: React.FC = () => {
     setCart(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
-  const handleAddProduct = () => {
-    const newProduct: Product = {
-        id: Date.now().toString(), 
-        name: '新商品',
-        image: 'https://images.unsplash.com/photo-1615484477778-ca3b77940c25?auto=format&fit=crop&w=500&q=80', 
-        price: 1.0,
-        unit: '份'
-    };
-    setProducts(prev => [...prev, newProduct]);
+  const handleAddProduct = async (name: string, price: number, unit: string, image: string) => {
+    try {
+        const { data, error } = await supabase.from('products').insert([
+            { name, price, unit, image }
+        ]).select();
+
+        if (error) {
+            console.error('Add product error:', error);
+            alert(`添加商品失败: ${error.message}`);
+            return;
+        }
+
+        alert('商品添加成功！');
+        
+        // Refresh product list locally
+        if (data && data.length > 0) {
+            const newProd = data[0];
+             const newProduct: Product = {
+                id: newProd.id.toString(),
+                name: newProd.name,
+                image: newProd.image,
+                price: Number(newProd.price),
+                unit: newProd.unit
+            };
+            setProducts(prev => [...prev, newProduct]);
+        } else {
+             // Fallback refresh logic if select() doesn't return data
+             const { data: refreshedData } = await supabase.from('products').select('*');
+             if(refreshedData) {
+                 const mapped = refreshedData.map((p: any) => ({
+                    id: p.id.toString(),
+                    name: p.name,
+                    image: p.image,
+                    price: Number(p.price),
+                    unit: p.unit
+                 }));
+                 setProducts(mapped);
+             }
+        }
+    } catch (e: any) {
+        console.error('System error:', e);
+        alert(`系统错误: ${e.message}`);
+    }
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -209,7 +244,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleCheckout = async (address: string) => {
+  const handleCheckout = async (address: string, phone: string) => {
     if (!userProfile || cart.length === 0) return;
 
     // Generate standardized ID: ORD-YYYYMMDD-XXXX
@@ -242,6 +277,7 @@ const App: React.FC = () => {
       timestamp: Date.now(),
       status: 'pending',
       address: address, // Save address to DB
+      phone: phone,     // Save phone to DB
       created_at: new Date().toISOString()
     };
 
@@ -263,7 +299,8 @@ const App: React.FC = () => {
         total: total,
         timestamp: Date.now(),
         status: 'pending',
-        address: address // Update local model
+        address: address, // Update local model
+        phone: phone      // Update local model
       };
 
       setOrders(prev => [newOrder, ...prev]);
@@ -358,7 +395,7 @@ const App: React.FC = () => {
                     orders={orders}
                     users={users}
                     onUpdateProduct={handleUpdateProduct} 
-                    onAddProduct={handleAddProduct}
+                    onAddProduct={(name, price, unit, image) => handleAddProduct(name, price, unit, image)}
                     onDeleteProduct={handleDeleteProduct}
                     onDeleteOrder={handleDeleteOrder}
                     onUpdateOrder={handleUpdateOrder}
