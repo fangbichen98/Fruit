@@ -17,13 +17,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     unit: '把' 
   },
   { 
-    id: '3', 
-    name: '巨峰葡萄', 
-    image: 'https://images.unsplash.com/photo-1537640538965-175931b15d66?auto=format&fit=crop&w=800&q=80', 
-    price: 18.0, 
-    unit: '公斤' 
-  },
-  { 
     id: '4', 
     name: '赣南脐橙', 
     image: 'https://images.unsplash.com/photo-1547514701-42782101795e?auto=format&fit=crop&w=800&q=80', 
@@ -36,13 +29,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     image: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?auto=format&fit=crop&w=800&q=80', 
     price: 35.0, 
     unit: '盒' 
-  },
-  { 
-    id: '6', 
-    name: '牛油果', 
-    image: 'https://images.unsplash.com/photo-1519162808019-7de1623bb133?auto=format&fit=crop&w=800&q=80', 
-    price: 9.9, 
-    unit: '个' 
   },
   { 
     id: '7', 
