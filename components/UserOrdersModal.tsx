@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Order } from '../types';
-import { X, MessageSquare, Clock, MapPin, Package, Send } from 'lucide-react';
+import { X, MessageSquare, Clock, MapPin, Package, Send, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // Re-initialize client here or pass as prop. Using the same config for simplicity.
@@ -19,7 +19,9 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({ userId, onClos
   const [loading, setLoading] = useState(true);
   const [feedbackOrderId, setFeedbackOrderId] = useState<string | null>(null);
   const [feedbackContent, setFeedbackContent] = useState('');
+  const [feedbackImage, setFeedbackImage] = useState<string>('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch Orders on Mount
   useEffect(() => {
@@ -69,6 +71,17 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({ userId, onClos
     fetchHistory();
   }, [userId]);
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFeedbackImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmitFeedback = async () => {
     if (!feedbackContent.trim() || !feedbackOrderId) return;
     
@@ -78,6 +91,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({ userId, onClos
         user_id: userId,
         order_id: feedbackOrderId,
         content: feedbackContent,
+        image_url: feedbackImage || null,
         status: 'pending'
       });
 
@@ -86,6 +100,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({ userId, onClos
       alert('反馈已提交，商家将尽快联系您');
       setFeedbackOrderId(null);
       setFeedbackContent('');
+      setFeedbackImage('');
     } catch (e: any) {
       alert('提交反馈失败: ' + e.message);
     } finally {
@@ -156,28 +171,68 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({ userId, onClos
         {/* Feedback Modal Overlay */}
         {feedbackOrderId && (
            <div className="absolute inset-0 z-10 bg-black/20 backdrop-blur-[1px] flex items-end sm:items-center justify-center p-4">
-              <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-4 animate-in slide-in-from-bottom-10 duration-200">
-                 <h4 className="font-bold text-slate-800 mb-2">提交售后反馈</h4>
-                 <p className="text-xs text-slate-500 mb-3">订单: {feedbackOrderId}</p>
-                 <textarea 
-                    value={feedbackContent}
-                    onChange={(e) => setFeedbackContent(e.target.value)}
-                    placeholder="请描述您遇到的问题..."
-                    className="w-full h-24 p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none mb-3"
-                 />
+              <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-4 animate-in slide-in-from-bottom-10 duration-200 max-h-[90vh] overflow-y-auto">
+                 <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-bold text-slate-800">提交售后反馈</h4>
+                    <button onClick={() => { setFeedbackOrderId(null); setFeedbackContent(''); setFeedbackImage(''); }} className="text-slate-400 hover:text-slate-600">
+                        <X size={18} />
+                    </button>
+                 </div>
+                 <p className="text-xs text-slate-500 mb-3 bg-slate-50 p-2 rounded">订单: {feedbackOrderId}</p>
+                 
+                 <div className="space-y-3 mb-4">
+                     <textarea 
+                        value={feedbackContent}
+                        onChange={(e) => setFeedbackContent(e.target.value)}
+                        placeholder="请描述您遇到的问题（必填）..."
+                        className="w-full h-24 p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                     />
+                     
+                     {/* Image Upload Area */}
+                     <div>
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            ref={fileInputRef} 
+                            onChange={handleImageSelect} 
+                            className="hidden" 
+                        />
+                        {!feedbackImage ? (
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-blue-300 transition-all"
+                            >
+                                <ImageIcon size={16} /> 上传图片 (可选)
+                            </button>
+                        ) : (
+                            <div className="relative w-full h-32 rounded-xl overflow-hidden border border-slate-200 group">
+                                <img src={feedbackImage} alt="Feedback" className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button 
+                                        onClick={() => setFeedbackImage('')}
+                                        className="p-2 bg-white/20 hover:bg-red-500 hover:text-white rounded-full text-white backdrop-blur-sm transition-colors"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                     </div>
+                 </div>
+
                  <div className="flex gap-2">
                    <button 
-                     onClick={() => { setFeedbackOrderId(null); setFeedbackContent(''); }}
-                     className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold"
+                     onClick={() => { setFeedbackOrderId(null); setFeedbackContent(''); setFeedbackImage(''); }}
+                     className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold"
                    >
                      取消
                    </button>
                    <button 
                      onClick={handleSubmitFeedback}
                      disabled={submittingFeedback || !feedbackContent.trim()}
-                     className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                     className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
                    >
-                     {submittingFeedback ? '提交中...' : <><Send size={14}/> 提交</>}
+                     {submittingFeedback ? '提交中...' : <><Send size={14}/> 提交反馈</>}
                    </button>
                  </div>
               </div>

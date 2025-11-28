@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Order, CartItem, RegisteredUser } from '../types';
-import { Settings, Save, Image as ImageIcon, LogOut, Trash2, Plus, Package, ClipboardList, Download, LayoutDashboard, TrendingUp, Filter, CalendarDays, Pencil, X, Minus, Users, MapPin, Phone, Database, MessageSquare, CheckCircle } from 'lucide-react';
+import { Settings, Save, Image as ImageIcon, LogOut, Trash2, Plus, Package, ClipboardList, Download, LayoutDashboard, TrendingUp, Filter, CalendarDays, Pencil, X, Minus, Users, MapPin, Phone, Database, MessageSquare, CheckCircle, Eye } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- Supabase Configuration ---
@@ -27,6 +27,7 @@ interface Feedback {
   user_id: string;
   order_id: string;
   content: string;
+  image_url?: string; // Added image_url field
   status: 'pending' | 'resolved';
   created_at: string;
 }
@@ -295,6 +296,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
   // Feedback State
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
+  const [viewFeedbackImage, setViewFeedbackImage] = useState<string | null>(null);
 
   // Fetch Feedbacks when tab is active
   useEffect(() => {
@@ -499,6 +501,16 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                     setEditingOrder(null);
                 }} 
             />
+        )}
+        {viewFeedbackImage && (
+             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setViewFeedbackImage(null)}>
+                 <div className="relative max-w-4xl max-h-[90vh] rounded-lg overflow-hidden">
+                     <img src={viewFeedbackImage} alt="Feedback Attachment" className="w-full h-full object-contain" />
+                     <button onClick={() => setViewFeedbackImage(null)} className="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70">
+                         <X size={24} />
+                     </button>
+                 </div>
+             </div>
         )}
 
         {/* Header Section */}
@@ -982,6 +994,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                                 <th className="p-5 text-xs font-bold uppercase tracking-wider">提交时间</th>
                                 <th className="p-5 text-xs font-bold uppercase tracking-wider">关联订单 / 用户</th>
                                 <th className="p-5 text-xs font-bold uppercase tracking-wider w-1/3">反馈内容</th>
+                                <th className="p-5 text-xs font-bold uppercase tracking-wider text-center">附件</th>
                                 <th className="p-5 text-xs font-bold uppercase tracking-wider text-center">状态</th>
                                 <th className="p-5 text-xs font-bold uppercase tracking-wider text-center">操作</th>
                             </tr>
@@ -1009,6 +1022,21 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                                             <p className="text-sm text-slate-700 whitespace-pre-wrap">{feedback.content}</p>
                                         </td>
                                         <td className="p-5 text-center">
+                                            {feedback.image_url ? (
+                                                <div 
+                                                    className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:border-blue-400 transition-colors mx-auto relative group"
+                                                    onClick={() => setViewFeedbackImage(feedback.image_url!)}
+                                                >
+                                                    <img src={feedback.image_url} alt="Attachment" className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Eye size={16} className="text-white" />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-slate-300">-</span>
+                                            )}
+                                        </td>
+                                        <td className="p-5 text-center">
                                             <span className={`px-2 py-1 rounded text-xs font-bold ${
                                                 feedback.status === 'resolved' 
                                                 ? 'bg-green-100 text-green-700' 
@@ -1034,7 +1062,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                             })}
                             {!loadingFeedbacks && feedbacks.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="p-12 text-center text-slate-400">暂无反馈记录</td>
+                                    <td colSpan={6} className="p-12 text-center text-slate-400">暂无反馈记录</td>
                                 </tr>
                             )}
                         </tbody>
