@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { INITIAL_PRODUCTS, INITIAL_ORDERS, INITIAL_USERS } from './constants';
+import { INITIAL_USERS } from './constants';
 import { Product, CartItem, UserProfile, Order, RegisteredUser } from './types';
 import { ProductCard } from './components/ProductCard';
 import { CartSummary } from './components/CartSummary';
@@ -20,39 +20,50 @@ const App: React.FC = () => {
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  // Initialize with empty arrays as data is fetched from Supabase
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [users, setUsers] = useState<RegisteredUser[]>(INITIAL_USERS);
 
-  // --- Merchant Data Fetching ---
+  // --- Global Data Fetching (Products) ---
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('id', { ascending: true });
+
+        if (error) {
+          console.error('Error fetching products:', error);
+          return;
+        }
+
+        if (data) {
+          const mappedProducts: Product[] = data.map((p: any) => ({
+            id: p.id.toString(),
+            name: p.name,
+            image: p.image_url || '', // Map DB field 'image_url' to UI field 'image'
+            price: Number(p.price),
+            unit: p.unit
+          }));
+          setProducts(mappedProducts);
+        }
+      } catch (e) {
+        console.error('System error fetching products:', e);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  // --- Merchant Data Fetching (Orders) ---
   useEffect(() => {
     if (userRole === 'merchant') {
-      const fetchMerchantData = async () => {
+      const fetchOrders = async () => {
         try {
-          // 1. Fetch Products
-          const { data: productsData, error: prodError } = await supabase
-            .from('products')
-            .select('*');
-          
-          let currentProducts = INITIAL_PRODUCTS;
-          
-          if (prodError) {
-            console.error('Fetching products failed, using mocks:', prodError);
-            // Fallback to INITIAL_PRODUCTS if table doesn't exist or error
-          } else if (productsData && productsData.length > 0) {
-            // Map Supabase data to Product interface
-            currentProducts = productsData.map((p: any) => ({
-              id: p.id.toString(),
-              name: p.name,
-              image: p.image_url || '', // Corrected from p.image to p.image_url
-              price: Number(p.price),
-              unit: p.unit
-            }));
-            setProducts(currentProducts);
-          }
-
-          // 2. Fetch Orders
+          // Fetch Orders
           const { data: ordersData, error: ordError } = await supabase
             .from('orders')
             .select('*')
@@ -67,14 +78,14 @@ const App: React.FC = () => {
                // DB Format: [{ name: "...", num: ... }]
                const rawItems = o.cart_items || [];
                
-               // Enrich items with product details (image, price) for display
+               // Enrich items with product details (image, price) from current products state
                const items = Array.isArray(rawItems) ? rawItems.map((ri: any) => {
-                 const productMatch = currentProducts.find(p => p.name === ri.name);
+                 const productMatch = products.find(p => p.name === ri.name);
                  return {
                    id: productMatch?.id || ri.name,
                    name: ri.name,
                    quantity: ri.num,
-                   image: productMatch?.image || '', // Fallback for UI
+                   image: productMatch?.image || '', // Fallback if product deleted
                    price: productMatch?.price || 0,
                    unit: productMatch?.unit || '份'
                  } as CartItem;
@@ -87,55 +98,42 @@ const App: React.FC = () => {
                  total: o.total || 0, 
                  timestamp: new Date(o.created_at).getTime(),
                  status: o.status || 'completed',
-                 address: o.address || '', // Read address from DB
-                 phone: o.phone || '' // Read phone from DB
+                 address: o.address || '', 
+                 phone: o.phone || ''
                };
              });
              setOrders(mappedOrders);
           }
-
         } catch (e) {
-          console.error("System Error during fetch:", e);
+          console.error("System Error during merchant fetch:", e);
         }
       };
 
-      fetchMerchantData();
+      fetchOrders();
     }
-  }, [userRole]);
+  }, [userRole, products]); // Re-run when products load so orders display correct images
 
 
-  // Generic Product Update Logic (Shared state)
-  const handleUpdateProduct = (id: string, field: keyof Product, value: any) => {
+  // Generic Product Update Logic (Shared state + DB persistence)
+  const handleUpdateProduct = async (id: string, field: keyof Product, value: any) => {
+    // 1. Optimistic Update (Local State)
     setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
     setCart(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
-  };
 
-  const handleInitializeData = async () => {
-    if (!window.confirm('确定要将 constants.ts 中的默认商品导入数据库吗？\n注意：这将写入 products 表。')) {
-        return;
-    }
-
+    // 2. DB Update
     try {
-        const payload = INITIAL_PRODUCTS.map(p => ({
-            id: Number(p.id), // Convert ID to number as requested
-            name: p.name,
-            price: p.price,
-            unit: p.unit,
-            image_url: p.image // Map local 'image' to DB 'image_url'
-        }));
+      // Map 'image' field back to 'image_url' for DB
+      const dbField = field === 'image' ? 'image_url' : field;
+      const { error } = await supabase
+        .from('products')
+        .update({ [dbField]: value })
+        .eq('id', id);
 
-        const { error } = await supabase.from('products').insert(payload);
-
-        if (error) {
-            console.error('Import error:', error);
-            alert(`导入失败: ${error.message}`);
-        } else {
-            alert('数据导入成功！');
-            // Trigger a refresh logic if needed, or user can reload page
-        }
-    } catch (e: any) {
-        console.error('System error:', e);
-        alert(`系统错误: ${e.message}`);
+      if (error) {
+        console.error('Supabase update failed:', error);
+      }
+    } catch (e) {
+      console.error('System error updating product:', e);
     }
   };
 
@@ -146,7 +144,7 @@ const App: React.FC = () => {
                 name, 
                 price, 
                 unit, 
-                image_url: image // Corrected: map image to image_url
+                image_url: image
             }
         ]).select();
 
@@ -158,30 +156,17 @@ const App: React.FC = () => {
 
         alert('商品添加成功！');
         
-        // Refresh product list locally
+        // Refresh local state from DB response
         if (data && data.length > 0) {
             const newProd = data[0];
              const newProduct: Product = {
                 id: newProd.id.toString(),
                 name: newProd.name,
-                image: newProd.image_url, // Map back for local state
+                image: newProd.image_url,
                 price: Number(newProd.price),
                 unit: newProd.unit
             };
             setProducts(prev => [...prev, newProduct]);
-        } else {
-             // Fallback refresh logic if select() doesn't return data
-             const { data: refreshedData } = await supabase.from('products').select('*');
-             if(refreshedData) {
-                 const mapped = refreshedData.map((p: any) => ({
-                    id: p.id.toString(),
-                    name: p.name,
-                    image: p.image_url,
-                    price: Number(p.price),
-                    unit: p.unit
-                 }));
-                 setProducts(mapped);
-             }
         }
     } catch (e: any) {
         console.error('System error:', e);
@@ -196,8 +181,7 @@ const App: React.FC = () => {
              const { error } = await supabase.from('products').delete().eq('id', id);
              if (error) {
                  console.error('Delete product error:', error);
-                 // Assuming if table doesn't exist we just update local state
-                 if (error.code !== '42P01') { // 42P01 is undefined_table
+                 if (error.code !== '42P01') { 
                      alert('删除商品失败');
                      return;
                  }
@@ -306,12 +290,12 @@ const App: React.FC = () => {
     const orderData = {
       id: newId,
       user_info: userProfile,
-      cart_items: formattedCartItems, // Store structured JSON array here as requested
+      cart_items: formattedCartItems, 
       total: total,
       timestamp: Date.now(),
       status: 'pending',
-      address: address, // Save address to DB
-      phone: phone,     // Save phone to DB
+      address: address,
+      phone: phone,
       created_at: new Date().toISOString()
     };
 
@@ -333,8 +317,8 @@ const App: React.FC = () => {
         total: total,
         timestamp: Date.now(),
         status: 'pending',
-        address: address, // Update local model
-        phone: phone      // Update local model
+        address: address, 
+        phone: phone      
       };
 
       setOrders(prev => [newOrder, ...prev]);
@@ -385,7 +369,7 @@ const App: React.FC = () => {
                     onClick={() => {
                         setUserRole(null);
                         setUserProfile(null);
-                        setCart([]); // Clear cart on logout
+                        setCart([]); 
                     }}
                     className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
                     title="退出登录"
@@ -408,15 +392,22 @@ const App: React.FC = () => {
                     </div>
                 </div>
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-                    {products.map(product => (
-                        <ProductCard 
-                            key={product.id} 
-                            product={product} 
-                            onAdd={addToCart} 
-                        />
-                    ))}
-                </div>
+                {products.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mb-4"></div>
+                        <p>正在加载新鲜水果...</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+                        {products.map(product => (
+                            <ProductCard 
+                                key={product.id} 
+                                product={product} 
+                                onAdd={addToCart} 
+                            />
+                        ))}
+                    </div>
+                )}
                 
                 <div className="mt-12 text-center text-slate-400 text-sm pb-8">
                     <p>我们可以为您提供最新鲜的当季水果。</p>
@@ -434,7 +425,6 @@ const App: React.FC = () => {
                     onDeleteOrder={handleDeleteOrder}
                     onUpdateOrder={handleUpdateOrder}
                     onDeleteUser={handleDeleteUser}
-                    onInitializeData={handleInitializeData}
                     onLogout={() => {
                         setUserRole(null);
                         setUserProfile(null);
