@@ -214,8 +214,33 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateOrder = (updatedOrder: Order) => {
+  const handleUpdateOrder = async (updatedOrder: Order) => {
+    // Optimistic Update
     setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+
+    try {
+        // Update in DB
+        const { error } = await supabase
+            .from('orders')
+            .update({ 
+                status: updatedOrder.status,
+                address: updatedOrder.address,
+                phone: updatedOrder.phone,
+                // Update items in case they were modified in modal
+                cart_items: updatedOrder.items.map(i => ({ name: i.name, num: i.quantity })),
+                total: updatedOrder.total,
+                // Update user info if nickname changed
+                user_info: updatedOrder.user
+            })
+            .eq('id', updatedOrder.id);
+
+        if (error) {
+            console.error('Update order failed:', error);
+            // Optionally revert local state here or alert user
+        }
+    } catch (e) {
+        console.error('System error updating order:', e);
+    }
   };
 
   // User Management Logic
@@ -265,18 +290,13 @@ const App: React.FC = () => {
   const handleCheckout = async (address: string, phone: string) => {
     if (!userProfile || cart.length === 0) return;
 
-    // Generate standardized ID: ORD-YYYYMMDD-XXXX
+    // Generate robust ID: ORD-YYYYMMDD-HHMMSS-RRR (Random 3 digits)
+    // This prevents duplicate keys regardless of how many users are active or if order list is empty locally
     const now = new Date();
-    const year = now.getFullYear();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const day = now.getDate().toString().padStart(2, '0');
-    const dateKey = `${year}${month}${day}`;
-    
-    // Find how many orders exist for today to generate sequence
-    const todayPrefix = `ORD-${dateKey}`;
-    const todayOrdersCount = orders.filter(o => o.id.startsWith(todayPrefix)).length;
-    const sequence = (todayOrdersCount + 1).toString().padStart(4, '0');
-    const newId = `${todayPrefix}-${sequence}`;
+    const dateStr = now.toISOString().slice(0,10).replace(/-/g, ''); // 20231128
+    const timeStr = now.toTimeString().slice(0,8).replace(/:/g, ''); // 143005
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const newId = `ORD-${dateStr}-${timeStr}-${random}`;
 
     const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     
@@ -292,7 +312,7 @@ const App: React.FC = () => {
       user_info: userProfile,
       cart_items: formattedCartItems, 
       total: total,
-      timestamp: Date.now(),
+      // REMOVED 'timestamp' field to avoid [object Object] error if column missing
       status: 'pending',
       address: address,
       phone: phone,
@@ -305,7 +325,8 @@ const App: React.FC = () => {
 
       if (error) {
         console.error('Supabase error:', error);
-        alert('提交订单失败，请稍后重试');
+        // Alert specific message instead of object
+        alert('提交订单失败: ' + (error.message || '未知错误'));
         return;
       }
 
@@ -323,10 +344,11 @@ const App: React.FC = () => {
 
       setOrders(prev => [newOrder, ...prev]);
       setCart([]);
-      alert('提交成功');
+      alert('订单已提交，商家确认收款后将尽快发货！');
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Unexpected error:', err);
+      alert('系统异常: ' + (err.message || err));
     }
   };
 

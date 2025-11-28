@@ -9,8 +9,55 @@ interface CartSummaryProps {
   onCheckout: (address: string, phone: string) => void;
 }
 
+// Payment Modal Component
+const PaymentModal: React.FC<{
+  total: number;
+  onClose: () => void;
+  onConfirm: () => void;
+}> = ({ total, onClose, onConfirm }) => {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+       <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+             <h3 className="font-bold text-slate-800">请扫码支付</h3>
+             <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
+               <X size={20} className="text-slate-500"/>
+             </button>
+          </div>
+          <div className="p-6 flex flex-col items-center text-center">
+             <div className="text-3xl font-bold text-slate-900 mb-4">¥{total.toFixed(2)}</div>
+             <div className="w-56 h-56 bg-slate-100 rounded-xl mb-4 flex items-center justify-center overflow-hidden border-2 border-dashed border-slate-200 p-2">
+                <img 
+                  src="pic/payment.jpg" 
+                  alt="Payment QR" 
+                  className="w-full h-full object-cover rounded-lg" 
+                  onError={(e) => {
+                      // Fallback placeholder if image missing
+                      e.currentTarget.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=alipayqr://platformapi/startapp?saId=10000007'; 
+                  }}
+                />
+             </div>
+             <p className="text-sm text-slate-600 font-medium mb-1">请扫描上方二维码进行支付</p>
+             <div className="mt-2 text-xs text-orange-600 font-medium bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
+               ⚠️ 支付备注：地址 + 手机号后四位
+             </div>
+          </div>
+          <div className="p-4 border-t border-slate-100 grid grid-cols-2 gap-3 bg-slate-50">
+             <button onClick={onClose} className="py-2.5 rounded-xl font-bold text-slate-600 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all">
+               取消
+             </button>
+             <button onClick={onConfirm} className="py-2.5 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200 active:scale-95 transition-all">
+               我已支付
+             </button>
+          </div>
+       </div>
+    </div>
+  );
+};
+
 export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, onCheckout }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
 
@@ -26,16 +73,31 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, 
         alert('请填写联系电话');
         return;
       }
+      // Open Payment Modal instead of direct checkout
+      setShowPayment(true);
+  };
+
+  const handlePaymentConfirm = () => {
       onCheckout(address, phone);
+      setShowPayment(false);
       setIsOpen(false);
-      setAddress(''); // Reset address after checkout
-      setPhone('');   // Reset phone after checkout
+      setAddress(''); 
+      setPhone('');   
   };
 
   if (count === 0 && !isOpen) return null;
 
   return (
     <>
+      {/* Payment Modal Overlay */}
+      {showPayment && (
+        <PaymentModal 
+          total={total} 
+          onClose={() => setShowPayment(false)} 
+          onConfirm={handlePaymentConfirm} 
+        />
+      )}
+
       {/* Expanded Cart / Modal */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm transition-opacity">
@@ -126,7 +188,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, 
                 onClick={handleCheckoutClick}
                 disabled={!address.trim() || !phone.trim()}
               >
-                {address.trim() && phone.trim() ? '立即结算' : '请填写完整信息'}
+                {address.trim() && phone.trim() ? '去结算' : '请填写完整信息'}
               </button>
             </div>
           </div>
@@ -134,7 +196,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, 
       )}
 
       {/* Floating Bar (Sticky Footer) */}
-      {!isOpen && (
+      {!isOpen && !showPayment && (
         <div className="fixed bottom-6 left-0 right-0 px-4 sm:px-6 z-40 flex justify-center">
             <button 
                 onClick={() => setIsOpen(true)}

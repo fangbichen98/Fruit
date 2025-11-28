@@ -737,8 +737,22 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                                                 <div className="text-sm font-medium text-slate-700">
                                                     {formatDate(order.timestamp)}
                                                 </div>
-                                                <div className={`mt-1 inline-flex px-2 py-0.5 rounded text-[10px] font-medium ${order.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                                                    {order.status === 'completed' ? '已完成' : '待处理'}
+                                                <div className="relative mt-1 inline-block">
+                                                    <select
+                                                        value={order.status}
+                                                        onChange={(e) => onUpdateOrder({ ...order, status: e.target.value as 'completed' | 'pending' })}
+                                                        className={`appearance-none pl-2 pr-6 py-1 rounded text-[10px] font-medium border-0 cursor-pointer focus:ring-2 focus:ring-opacity-50 transition-colors ${
+                                                            order.status === 'completed' 
+                                                            ? 'bg-green-100 text-green-700 hover:bg-green-200 focus:ring-green-500' 
+                                                            : 'bg-orange-100 text-orange-700 hover:bg-orange-200 focus:ring-orange-500'
+                                                        }`}
+                                                    >
+                                                        <option value="pending">待处理</option>
+                                                        <option value="completed">已完成</option>
+                                                    </select>
+                                                    <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 ${order.status === 'completed' ? 'text-green-700' : 'text-orange-700'}`}>
+                                                        <svg className="w-3 h-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="p-5">
