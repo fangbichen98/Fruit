@@ -1,22 +1,28 @@
 import React, { useState } from 'react';
 import { CartItem } from '../types';
-import { ShoppingBag, X, Minus, Plus } from 'lucide-react';
+import { ShoppingBag, X, Minus, Plus, MapPin } from 'lucide-react';
 
 interface CartSummaryProps {
   cart: CartItem[];
   updateQuantity: (id: string, delta: number) => void;
-  onCheckout: () => void;
+  onCheckout: (address: string) => void;
 }
 
 export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, onCheckout }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [address, setAddress] = useState('');
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCheckoutClick = () => {
-      onCheckout();
+      if (!address.trim()) {
+        alert('请填写收货地址');
+        return;
+      }
+      onCheckout(address);
       setIsOpen(false);
+      setAddress(''); // Reset address after checkout
   };
 
   if (count === 0 && !isOpen) return null;
@@ -74,16 +80,31 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart, updateQuantity, 
             </div>
 
             {/* Footer Actions */}
-            <div className="p-5 border-t border-slate-100 bg-slate-50">
-              <div className="flex justify-between items-end mb-4">
+            <div className="p-5 border-t border-slate-100 bg-slate-50 space-y-4">
+              {/* Address Input */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                  <MapPin size={16} className="text-slate-400" /> 收货地址
+                </label>
+                <input 
+                  type="text" 
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="请输入宿舍号或详细地址 (必填)"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                />
+              </div>
+
+              <div className="flex justify-between items-end pt-2">
                 <span className="text-slate-500">合计</span>
                 <span className="text-3xl font-bold text-emerald-600">¥{total.toFixed(2)}</span>
               </div>
               <button 
-                className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold text-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all"
+                className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold text-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleCheckoutClick}
+                disabled={!address.trim()}
               >
-                立即结算
+                {address.trim() ? '立即结算' : '请填写地址'}
               </button>
             </div>
           </div>

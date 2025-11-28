@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Product, Order, CartItem, RegisteredUser } from '../types';
-import { Settings, Save, Image as ImageIcon, LogOut, Trash2, Plus, Package, ClipboardList, Download, LayoutDashboard, TrendingUp, Filter, CalendarDays, Pencil, X, Minus, Users } from 'lucide-react';
+import { Settings, Save, Image as ImageIcon, LogOut, Trash2, Plus, Package, ClipboardList, Download, LayoutDashboard, TrendingUp, Filter, CalendarDays, Pencil, X, Minus, Users, MapPin } from 'lucide-react';
 
 interface MerchantPanelProps {
   products: Product[];
@@ -84,6 +84,17 @@ const EditOrderModal: React.FC<{
                 value={editedOrder.user.nickname}
                 onChange={(e) => setEditedOrder({...editedOrder, user: {...editedOrder.user, nickname: e.target.value}})}
                 className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+             />
+          </div>
+
+          <div>
+             <label className="text-xs font-semibold text-slate-500 uppercase">收货地址</label>
+             <input 
+                type="text" 
+                value={editedOrder.address || ''}
+                onChange={(e) => setEditedOrder({...editedOrder, address: e.target.value})}
+                className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+                placeholder="请输入地址"
              />
           </div>
 
@@ -295,12 +306,13 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
   const downloadOrdersCSV = () => {
     // BOM for Excel to read UTF-8 correctly
     const bom = '\uFEFF'; 
-    const headers = "订单号,下单时间,客户昵称,状态,商品列表,总金额(元)\n";
+    const headers = "订单号,下单时间,客户昵称,收货地址,状态,商品列表,总金额(元)\n";
     const rows = filteredOrdersList.map(order => {
         const date = formatDate(order.timestamp);
         const items = order.items.map(i => `${i.name}x${i.quantity}`).join(' | ');
         const status = order.status === 'completed' ? '已完成' : '待处理';
-        return `${order.id},"${date}",${order.user.nickname},${status},"${items}",${order.total.toFixed(2)}`;
+        const address = order.address ? order.address.replace(/,/g, ' ') : ''; // Clean address for CSV
+        return `${order.id},"${date}",${order.user.nickname},"${address}",${status},"${items}",${order.total.toFixed(2)}`;
     }).join("\n");
 
     const csvContent = bom + headers + rows;
@@ -655,7 +667,14 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
                                             <td className="p-5">
                                                 <div className="flex items-center gap-3">
                                                     <img src={order.user.avatar} className="w-8 h-8 rounded-full bg-slate-100" alt="avatar" />
-                                                    <span className="text-sm font-medium text-slate-900">{order.user.nickname}</span>
+                                                    <div>
+                                                        <div className="text-sm font-medium text-slate-900">{order.user.nickname}</div>
+                                                        {order.address && (
+                                                            <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1 max-w-[150px] truncate" title={order.address}>
+                                                                <MapPin size={10} /> {order.address}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="p-5">

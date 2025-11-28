@@ -34,6 +34,7 @@ export interface Order {
   total: number;
   timestamp: number;
   status: 'completed' | 'pending';
+  address?: string; // Added address field
 }
 
 export interface RecipeResponse {

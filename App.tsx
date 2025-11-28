@@ -86,7 +86,8 @@ const App: React.FC = () => {
                  items: items,
                  total: o.total || 0, 
                  timestamp: new Date(o.created_at).getTime(),
-                 status: o.status || 'completed'
+                 status: o.status || 'completed',
+                 address: o.address || '' // Read address from DB
                };
              });
              setOrders(mappedOrders);
@@ -208,7 +209,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (address: string) => {
     if (!userProfile || cart.length === 0) return;
 
     // Generate standardized ID: ORD-YYYYMMDD-XXXX
@@ -240,6 +241,7 @@ const App: React.FC = () => {
       total: total,
       timestamp: Date.now(),
       status: 'pending',
+      address: address, // Save address to DB
       created_at: new Date().toISOString()
     };
 
@@ -260,7 +262,8 @@ const App: React.FC = () => {
         items: [...cart],
         total: total,
         timestamp: Date.now(),
-        status: 'pending'
+        status: 'pending',
+        address: address // Update local model
       };
 
       setOrders(prev => [newOrder, ...prev]);
